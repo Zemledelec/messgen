@@ -23,11 +23,11 @@ struct Dynamic {
         return true;
     }
 
-    T &operator[](uint16_t idx) {
+    T &operator[](uint32_t idx) {
         return ptr[idx];
     }
 
-    const T &operator[](uint16_t idx) const {
+    const T &operator[](uint32_t idx) const {
         return ptr[idx];
     }
 };
