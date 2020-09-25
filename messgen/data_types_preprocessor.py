@@ -6,11 +6,12 @@ class DataTypesPreprocessor:
     MAX_PROTO_ID = 0x80
     MSGS_NAMESPACE = "msgs"
 
-    def __init__(self, plain_types_map, special_types_map):
+    def __init__(self, plain_types_map, special_types_map, dynamic_field_size):
         self._plain_types_map = plain_types_map
         self._special_types_map = special_types_map
         self._types_map = {}
         self._lookup_table = {}
+        self._dynamic_field_size = dynamic_field_size
 
         for k, v in plain_types_map.items():
             self._types_map[k] = {
@@ -125,7 +126,6 @@ class DataTypesPreprocessor:
 
         alignment = 0
         static_size = 0
-        full_size = 0
 
         for field in fields:
             child_norm_typename = self.__normalize_typename(module_name, field["type"])
@@ -163,7 +163,7 @@ class DataTypesPreprocessor:
                 children_number = field["num"]
             elif field["is_dynamic"]:
                 children_number = 0
-                static_size += 2
+                static_size += self._dynamic_field_size
             elif not field["is_array"]:
                 children_number = 1
 

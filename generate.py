@@ -11,6 +11,7 @@ from messgen.data_types_preprocessor import DataTypesPreprocessor
 from messgen import MessgenException
 
 MODULE_SEP = "/"
+DYNAMIC_FIELD_SIZE = 4
 
 generators = {
     "cpp": CppGenerator,
@@ -124,7 +125,7 @@ def main():
 
         modules_map = load_modules(args.basedirs, args.modules)
 
-        data_types_preprocessor = DataTypesPreprocessor(PLAIN_TYPES, SPECIAL_TYPES)
+        data_types_preprocessor = DataTypesPreprocessor(PLAIN_TYPES, SPECIAL_TYPES, DYNAMIC_FIELD_SIZE)
         data_types_map = data_types_preprocessor.create_types_map(modules_map)
         with open("dump.txt", "w+") as f:
             f.write(__dump_datatypes(modules_map, data_types_map))
@@ -133,7 +134,7 @@ def main():
         if g_type is None:
             raise Exception("Unsupported language " + args.lang)
 
-        g = g_type(modules_map, data_types_map, MODULE_SEP, variables)
+        g = g_type(modules_map, data_types_map, MODULE_SEP, variables, DYNAMIC_FIELD_SIZE)
         g.generate(args.outdir)
     except MessgenException as e:
         print(e)

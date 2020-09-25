@@ -10,7 +10,6 @@ MESSAGE_SIZE_C_TYPE = "size_t"
 MESSAGE_PROTO_C_TYPE = "uint8_t"
 
 TYPE_FIELD_SIZE = 1
-DYN_FIELD_LEN_SIZE = 4
 INPUT_BUF_NAME = "buf"
 INPUT_ALLOC_NAME = "allocator"
 INDENT = "    "
@@ -122,8 +121,6 @@ def simplify_type_namespace(typename, current_namespace):
     typename_entries = typename.split("::")
     ns_entries = current_namespace.split("::")
 
-    iter_size = min(len(typename_entries), len(ns_entries))
-
     i = 0
     while typename_entries[i] == ns_entries[i]:
         i += 1
@@ -207,9 +204,9 @@ def allocate_memory(dst, type, size):
             "if (%s == nullptr) {return 0;}" % dst]
 
 
-def get_dynamic_field_items_num():
+def get_dynamic_field_items_num(dyn_field_size):
     size = ""
-    for i in range(DYN_FIELD_LEN_SIZE):
+    for i in range(dyn_field_size):
         shift_str = "(ptr[%d] << (%dU*8U))" % (i, i)
         size += " " + shift_str + " |"
 
@@ -221,7 +218,7 @@ def get_mem_size(dynamic_field_len, dyn_type):
 
 
 def is_null(s):
-    return "%s == nullptr" % (s)
+    return "%s == nullptr" % s
 
 
 def is_not_null(s):
@@ -241,10 +238,12 @@ def arr_item(arr, idx):
 
 
 class CppGenerator:
-    def __init__(self, modules_map, data_types_map, module_sep, variables):
+    def __init__(self, modules_map, data_types_map, module_sep, variables, dynamic_field_size):
         self.MODULE_SEP = module_sep
         self._modules_map = modules_map
         self._data_types_map = data_types_map
+        self._variables = variables
+        self._dynamic_field_size = dynamic_field_size
 
         self._indent_cnt = 0
         self._indent = ""
@@ -360,7 +359,7 @@ class CppGenerator:
         self.generate_parse_method(message_obj)
         self.append("")
 
-        self.generate_get_size_method(message_obj)
+        self.generate_get_size_method()
         self.append("")
 
         self.generate_get_dynamic_size_method(message_obj)
@@ -386,14 +385,12 @@ class CppGenerator:
 
         return list(self._code), includes
 
-
-    def generate_get_size_method(self, message_obj):
+    def generate_get_size_method(self):
         self.start_block("size_t get_size() const")
         self.extend([
             "return STATIC_SIZE + get_dynamic_size();"
         ])
         self.stop_block()
-
 
     def generate_get_dynamic_size_method(self, message_obj):
         self.start_block("size_t get_dynamic_size() const")
@@ -421,7 +418,7 @@ class CppGenerator:
                     self.start_for_cycle(size_limit)
                     self.append(set_inc_var("size", "%s[i].%s()" % (ptr, size_func)))
                     self.stop_cycle()
-            
+
             elif not typeinfo["plain"]:
                 self.append(set_inc_var("size", "%s.get_dynamic_size()" % field["name"]))
 
@@ -446,8 +443,10 @@ class CppGenerator:
 
                 if field["type"] == "string":
                     self.extend([
-                        "if ((%s) && (%s)) {return false;}" % (is_null(field["name"]), is_not_null("other." + field["name"])),
-                        "if ((%s) && (%s)) {return false;}" % (is_not_null(field["name"]), is_null("other." + field["name"])),
+                        "if ((%s) && (%s)) {return false;}" % (
+                            is_null(field["name"]), is_not_null("other." + field["name"])),
+                        "if ((%s) && (%s)) {return false;}" % (
+                            is_not_null(field["name"]), is_null("other." + field["name"])),
                         "if ((%s) && (%s)) { " % (is_not_null(field["name"]), is_not_null("other." + field["name"])),
                         INDENT + "if (strcmp(%s, %s) != 0) {return false;}" % (field["name"], "other." + field["name"]),
                         "}",
@@ -470,7 +469,7 @@ class CppGenerator:
                         self.start_for_cycle(num)
                         self.append("if (!(%s[i] == other.%s[i])) {return false;}" % (ptr, ptr))
                         self.stop_cycle()
-                        
+
                 self.append("")
 
             self.append("return true;")
@@ -506,18 +505,17 @@ class CppGenerator:
             ""
         ])
 
-        ### Process plain fields
+        # Process plain fields
         copy_size, current_field_pos = self.__get_plain_fields_size_and_last_field_position(message["fields"])
 
         if copy_size != 0:
             self.__copy_struct_block("&" + message["fields"][0]["name"], copy_size)
 
-        ### Process composite fields
-        for  field in message["fields"][current_field_pos:]:
+        # Process composite fields
+        for field in message["fields"][current_field_pos:]:
             if field["is_dynamic"]:
                 break
-         
-            typeinfo = self._data_types_map[field["type"]]
+
             current_field_pos += 1
 
             if field["is_array"]:
@@ -528,7 +526,7 @@ class CppGenerator:
 
         self.append("")
 
-        ### Process dynamic fields
+        # Process dynamic fields
         for field in message["fields"][current_field_pos:]:
             typeinfo = self._data_types_map[field["type"]]
 
@@ -552,12 +550,12 @@ class CppGenerator:
                 self.__serialize_dynamic_field_length(dyn_size)
 
                 if typeinfo["plain"]:
-                        mem_size = dyn_size + "*" + str(typeinfo["static_size"])
-                        self.extend([
-                            memcpy("ptr", dyn_ptr, mem_size),
-                            set_inc_var("ptr", mem_size),
-                            ""
-                        ])
+                    mem_size = dyn_size + "*" + str(typeinfo["static_size"])
+                    self.extend([
+                        memcpy("ptr", dyn_ptr, mem_size),
+                        set_inc_var("ptr", mem_size),
+                        ""
+                    ])
                 else:
                     self.__serialize_struct_array(dyn_ptr, dyn_size)
 
@@ -585,7 +583,7 @@ class CppGenerator:
             ""
         ])
 
-        ### Process plain fields
+        # Process plain fields
         copy_size, current_field_pos = self.__get_plain_fields_size_and_last_field_position(message["fields"])
         if copy_size != 0:
             self.extend([
@@ -596,12 +594,11 @@ class CppGenerator:
                 ""
             ])
 
-        ### Process composite fields
+        # Process composite fields
         for field in message["fields"][current_field_pos:]:
             if field["is_dynamic"]:
                 break
-         
-            typeinfo = self._data_types_map[field["type"]]
+
             current_field_pos += 1
 
             if field["is_array"]:
@@ -612,21 +609,21 @@ class CppGenerator:
 
         self.append("")
 
-        ### Process dynamic fields
+        # Process dynamic fields
         for field in message["fields"][current_field_pos:]:
             typeinfo = self._data_types_map[field["type"]]
 
             self.extend([
-                "if (len < %d) {return 0;}" % DYN_FIELD_LEN_SIZE,
+                "if (len < %d) {return 0;}" % self._dynamic_field_size,
             ])
 
-            dyn_field_items_num = get_dynamic_field_items_num()   
+            dyn_field_items_num = get_dynamic_field_items_num(self._dynamic_field_size)
 
             if field["type"] == "string":
                 self.extend([
                     set_var("dyn_parsed_len", dyn_field_items_num),
-                    set_inc_var("ptr", DYN_FIELD_LEN_SIZE),
-                    set_dec_var("len", DYN_FIELD_LEN_SIZE)
+                    set_inc_var("ptr", self._dynamic_field_size),
+                    set_dec_var("len", self._dynamic_field_size)
                 ])
 
                 self.start_block("if (dyn_parsed_len > 0)")
@@ -648,8 +645,8 @@ class CppGenerator:
                 dyn_ptr_var, dyn_size_var = get_dyn_field_vars(field)
                 self.extend([
                     set_var(dyn_size_var, dyn_field_items_num),
-                    set_inc_var("ptr", DYN_FIELD_LEN_SIZE),
-                    set_dec_var("len", DYN_FIELD_LEN_SIZE),
+                    set_inc_var("ptr", self._dynamic_field_size),
+                    set_dec_var("len", self._dynamic_field_size),
                     *allocate_memory(dyn_ptr_var, to_cpp_type(field["type"]), dyn_size_var)
                 ])
 
@@ -687,8 +684,6 @@ class CppGenerator:
             self.append(var)
 
     def generate_metadata(self, message_obj):
-        msg_cpp_typename = to_cpp_type(message_obj["typename"])
-
         nested_structs_metadata = "{"
         fields_description = "\""
 
@@ -781,10 +776,9 @@ class CppGenerator:
         self.stop_cycle()
         self.append("")
 
-
     def __serialize_dynamic_field_length(self, length):
-        for i in range(DYN_FIELD_LEN_SIZE):
+        for i in range(self._dynamic_field_size):
             shift_str = "((%s >> (%dU*8U)) & 0xFFU)" % (str(length), i)
             self.append("ptr[%d] = %s;" % (i, shift_str))
-        
-        self.append(set_inc_var("ptr", str(DYN_FIELD_LEN_SIZE)))
+
+        self.append(set_inc_var("ptr", str(self._dynamic_field_size)))

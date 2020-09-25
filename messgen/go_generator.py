@@ -82,11 +82,12 @@ maproto_types = {
 class GoGenerator:
     PROTO_TYPE_VAR_TYPE = "uint8"
 
-    def __init__(self, modules_map, data_types_map, module_sep, variables):
+    def __init__(self, modules_map, data_types_map, module_sep, variables, dynamic_field_size):
         self.MODULE_SEP = module_sep
         self._modules_map = modules_map
         self._data_types_map = data_types_map
         self._variables = variables
+        self._dynamic_field_size = dynamic_field_size
 
     def generate(self, out_dir):
         package = "message"
