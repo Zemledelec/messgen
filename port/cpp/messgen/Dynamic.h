@@ -7,7 +7,7 @@ namespace messgen {
 template<class T>
 struct Dynamic {
     T *ptr;
-    uint16_t size;
+    uint32_t size;
 
     bool operator==(const Dynamic<T> &other) const {
         if (size != other.size) {
