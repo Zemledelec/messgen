@@ -63,7 +63,7 @@ def parse_string(t_info):
     return " = messgen.ReadString(buf[ptr:])"
 
 
-maproto_types = {
+go_types = {
     "char": {"fmt": fmt_int8, "parse": parse_int8, "storage_type": "byte"},
     "int8": {"fmt": fmt_int8, "parse": parse_int8},
     "uint8": {"fmt": fmt_int8, "parse": parse_int8},
@@ -78,6 +78,9 @@ maproto_types = {
     "string": {"fmt": fmt_string, "parse": parse_string, "imports": ["$MESSGEN_MODULE"]},
 }
 
+# All the types including go types, constants and messages
+all_types = dict(go_types)
+
 
 class GoGenerator:
     PROTO_TYPE_VAR_TYPE = "uint8"
@@ -87,6 +90,10 @@ class GoGenerator:
         self._modules_map = modules_map
         self._data_types_map = data_types_map
         self._variables = variables
+
+        for module_name, module in self._modules_map.items():
+            for constant in module["constants"]:
+                all_types
 
     def generate(self, out_dir):
         package = "message"
@@ -106,12 +113,38 @@ class GoGenerator:
                 print(e)
                 pass
 
-            consts_code = ["package %s" % package, "", "const ProtoId = %s" % module["proto_id"]]
+            constants = self.generate_constants(module.get("constants"))
+            consts_code = ["package %s" % package,
+                           "",
+                           "const ProtoId = %s" % module["proto_id"],
+                           "",
+                           *constants]
+
             self.__write_file(module_out_dir + os.path.sep + "message.go", consts_code)
             for msg in module["messages"]:
                 code = ["package %s" % package, ""]
                 code.extend(self.generate_msg(msg))
                 self.__write_file(module_out_dir + os.path.sep + msg["name"] + ".go", code)
+
+    def generate_constants(self, constants):
+        code = []
+
+        # Generate constatnts definition
+        for const in constants:
+            go_type = to_camelcase(const["name"])
+            
+            code = ["type %s = %s" % (go_type, const["basetype"]),
+                    "",
+                    "const ("
+            ]
+
+            for field in const["fields"]:
+                const_name = to_camelcase(const["name"] + "_" + field["name"])
+                code.append("\t%s %s = %s" % (const_name, go_type, field["value"]))
+
+            code.extend([")", ""])
+
+        return code
 
     def generate_msg(self, msg):
         msg_name = to_camelcase(msg["name"])

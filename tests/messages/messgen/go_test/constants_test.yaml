@@ -1,0 +1,4 @@
+id: 0
+fields:
+  - {name: "StateTestX", type: "StateX", descr: "StateX variable"}
+  - {name: "StateTestY", type: "StateY", descr: "StateY variable"}

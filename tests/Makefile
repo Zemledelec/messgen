@@ -16,6 +16,7 @@ all: cpp_tests_run
 messages: .done.messages
 .done.messages: $(MESSAGES_YAML)
 	python3 ../generate.py --basedirs $(shell pwd)/messages --modules messgen/messgen_test --outdir $(shell pwd)/cpp --lang cpp
+	python3 ../generate.py --basedirs $(shell pwd)/messages --modules messgen/go_test --outdir $(shell pwd)/go --lang go
 	touch .done.messages
 
 cpp_tests_run: cpp_tests_build

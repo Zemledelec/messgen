@@ -1,0 +1,13 @@
+- name: StateX
+  basetype: uint32
+  fields:
+    - {name: IDLE, value: 0}
+    - {name: RUNNING, value: 1}
+    - {name: STOP, value: 2}
+
+- name: StateY
+  basetype: uint16
+  fields:
+    - {name: IDLE, value: 0}
+    - {name: RUNNING, value: 1}
+    - {name: STOP, value: 2}
